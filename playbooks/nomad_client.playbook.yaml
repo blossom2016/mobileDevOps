@@ -1,0 +1,7 @@
+---
+- name: Set up a nomad client on the local machine running CI
+  hosts: nomad_client
+  roles:
+    - role: nomad
+      tags:
+        - nomad-client

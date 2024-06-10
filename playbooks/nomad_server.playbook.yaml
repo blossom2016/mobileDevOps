@@ -1,0 +1,7 @@
+---
+- name: Set up a nomad server on the local machine running CI
+  hosts: nomad_server
+  roles:
+    - role: nomad
+      tags:
+        - nomad-server

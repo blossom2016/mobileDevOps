@@ -1,0 +1,4 @@
+---
+- name: Placeholder
+  ansible.builtin.debug:
+    msg: Example - host {{ inventory_hostname }} os {{ ansible_system }}
