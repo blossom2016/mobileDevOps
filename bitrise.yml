@@ -1,11 +1,32 @@
+format_version: '8'
+default_step_lib_source: https://github.com/bitrise-io/bitrise-steplib.git
 workflows:
   primary:
     steps:
-      - git-clone:
-          title: Clone Repository
+      - git-clone: {}
       - script:
-          title: Run CI Pipeline
+          title: Install Ansible and Run CI Pipeline
           inputs:
             - content: |-
                 #!/bin/bash
-                ./ci_pipeline.sh
+                # Install Ansible if not installed
+                if ! command -v ansible &> /dev/null; then
+                  echo "Ansible is not installed. Installing Ansible..."
+                  /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+                  brew install ansible
+                fi
+
+                # Run the Ansible playbook
+                ansible-playbook playbook.yml
+
+                # Navigate to infra-tests directory
+                cd infra-tests
+
+                # Run the tests
+                ./run_tests.sh
+
+                # Capture the result
+                TEST_RESULT=$?
+
+                # Exit with the result of the tests
+                exit $TEST_RESULT
