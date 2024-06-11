@@ -1,32 +1,114 @@
-format_version: '8'
+format_version: '11'
 default_step_lib_source: https://github.com/bitrise-io/bitrise-steplib.git
+project_type: other
+meta:
+  bitrise.io:
+    stack: osx-xcode-15.2.x
+    machine_type_id: g2-m1.4core
+trigger_map:
+- pull_request_source_branch: "*"
+  workflow: ci
 workflows:
-  primary:
+  ci:
     steps:
-      - git-clone: {}
-      - script:
-          title: Install Ansible and Run CI Pipeline
-          inputs:
-            - content: |-
-                #!/bin/bash
-                # Install Ansible if not installed
-                if ! command -v ansible &> /dev/null; then
-                  echo "Ansible is not installed. Installing Ansible..."
-                  /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-                  brew install ansible
-                fi
+    - activate-ssh-key@4:
+        run_if: '{{getenv "SSH_RSA_PRIVATE_KEY" | ne ""}}'
+    - git-clone@6: {}
+    - script@1:
+        title: Install ansible
+        inputs:
+        - content: |-
+            #!/usr/bin/env bash
+            set -xeo pipefail
 
-                # Run the Ansible playbook
-                ansible-playbook playbook.yml
+            brew reinstall ansible
+            ansible --version
 
-                # Navigate to infra-tests directory
-                cd infra-tests
+            brew install ansible-lint
+            ansible-lint --version
+    - script@1:
+        title: 'Run linter: ansible-lint'
+        inputs:
+        - content: |-
+            #!/usr/bin/env bash
+            set -xeo pipefail
 
-                # Run the tests
-                ./run_tests.sh
+            ansible-lint roles/ playbooks/
+    - script@1:
+        title: 'Run linter: yamllint'
+        inputs:
+        - content: |-
+            #!/usr/bin/env bash
+            set -xeo pipefail
 
-                # Capture the result
-                TEST_RESULT=$?
+            yamllint roles/ playbooks/
+    - script@1:
+        title: Build nomad binaries
+        inputs:
+        - content: |-
+            #!/usr/bin/env bash
+            set -xeo pipefail
 
-                # Exit with the result of the tests
-                exit $TEST_RESULT
+            git clone https://github.com/your-username/nomad.git
+            cd nomad
+            git checkout v1.3.9
+
+            make bootstrap
+            make dev
+
+            mkdir -p $HOME/artifacts
+            cp bin/nomad $HOME/artifacts/nomad-darwin-amd64
+
+            GOOS=linux GOARCH=amd64 make dev
+            cp bin/nomad $HOME/artifacts/nomad-linux-amd64
+    - script@1:
+        title: Nomad server setup
+        inputs:
+        - content: |-
+            #!/usr/bin/env bash
+            set -xeo pipefail
+
+            ansible-playbook -i "localhost," -c local /mnt/data/nomad_server.playbook.yaml
+    - script@1:
+        title: Nomad client setup
+        inputs:
+        - content: |-
+            #!/usr/bin/env bash
+            set -xeo pipefail
+
+            ansible-playbook -i "localhost," -c local /mnt/data/nomad_client.playbook.yaml
+    - script@1:
+        title: Launch test job
+        inputs:
+        - content: |-
+            #!/usr/bin/env bash
+            set -xeo pipefail
+
+            cat <<EOF > nomad-challenge-job.nomad
+            job "nomad-challenge-job" {
+              datacenters = ["nomad-challenge-dc"]
+              type = "batch"
+              group "example" {
+                task "raw_exec" {
+                  driver = "raw_exec"
+                  config {
+                    command = "./challenge.sh"
+                  }
+                }
+              }
+            }
+            EOF
+
+            nomad job run nomad-challenge-job.nomad
+    - script@1:
+        title: Run tests - this must run green!
+        inputs:
+        - content: |-
+            #!/usr/bin/env bash
+            set -xeo pipefail
+
+            infra-tests/test.sh
+        is_always_run: true
+    - deploy-to-bitrise-io@2:
+        inputs:
+        - deploy_path: "$HOME/artifacts"

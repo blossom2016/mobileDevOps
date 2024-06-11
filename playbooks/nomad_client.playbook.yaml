@@ -1,16 +1,21 @@
-# ---
-# - name: Set up a nomad client on the local machine running CI
-#   hosts: nomad_client
-#   roles:
-#     - role: nomad
-#       tags:
-#         - nomad-client
 ---
 - name: Setup Nomad Client
   hosts: localhost
   become: true
   tasks:
-    - name: Ensure Nomad client service is running
+    - name: Ensure Nomad client is installed
+      homebrew:
+        name: nomad
+        state: present
+
+    - name: Start Nomad client
       launchd:
-        name: com.hashicorp.nomad.client
-        state: running
+        name: com.hashicorp.nomad
+        state: started
+        run_at_load: yes
+        program: /usr/local/bin/nomad
+        args:
+          - agent
+          - -client
+          - -dev
+          - -bind=127.0.0.1

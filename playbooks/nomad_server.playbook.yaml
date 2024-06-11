@@ -1,18 +1,21 @@
-# ---
-# - name: Set up a nomad server on the local machine running CI
-#   hosts: nomad_server
-#   roles:
-#     - role: nomad
-#       tags:
-#         - nomad-server
-
-
 ---
 - name: Setup Nomad Server
   hosts: localhost
   become: true
   tasks:
-    - name: Ensure Nomad server service is running
+    - name: Ensure Nomad server is installed
+      homebrew:
+        name: nomad
+        state: present
+
+    - name: Start Nomad server
       launchd:
-        name: com.hashicorp.nomad.server
-        state: running
+        name: com.hashicorp.nomad
+        state: started
+        run_at_load: yes
+        program: /usr/local/bin/nomad
+        args:
+          - agent
+          - -server
+          - -dev
+          - -bind=127.0.0.1
