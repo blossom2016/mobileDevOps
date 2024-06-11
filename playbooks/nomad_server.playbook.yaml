@@ -1,7 +1,18 @@
+# ---
+# - name: Set up a nomad server on the local machine running CI
+#   hosts: nomad_server
+#   roles:
+#     - role: nomad
+#       tags:
+#         - nomad-server
+
+
 ---
-- name: Set up a nomad server on the local machine running CI
-  hosts: nomad_server
-  roles:
-    - role: nomad
-      tags:
-        - nomad-server
+- name: Setup Nomad Server
+  hosts: localhost
+  become: true
+  tasks:
+    - name: Ensure Nomad server service is running
+      launchd:
+        name: com.hashicorp.nomad.server
+        state: running

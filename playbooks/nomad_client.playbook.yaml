@@ -1,7 +1,16 @@
+# ---
+# - name: Set up a nomad client on the local machine running CI
+#   hosts: nomad_client
+#   roles:
+#     - role: nomad
+#       tags:
+#         - nomad-client
 ---
-- name: Set up a nomad client on the local machine running CI
-  hosts: nomad_client
-  roles:
-    - role: nomad
-      tags:
-        - nomad-client
+- name: Setup Nomad Client
+  hosts: localhost
+  become: true
+  tasks:
+    - name: Ensure Nomad client service is running
+      launchd:
+        name: com.hashicorp.nomad.client
+        state: running
