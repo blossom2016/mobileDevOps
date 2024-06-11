@@ -1,3 +1,4 @@
+---
 format_version: '11'
 default_step_lib_source: https://github.com/bitrise-io/bitrise-steplib.git
 project_type: other
@@ -49,66 +50,61 @@ workflows:
             #!/usr/bin/env bash
             set -xeo pipefail
 
-            git clone https://github.com/blossom2016/nomad.git
-            cd nomad
-            git checkout v1.3.9
-
-            make bootstrap
-            make dev
-
-            mkdir -p $HOME/artifacts
-            cp bin/nomad $HOME/artifacts/nomad-darwin-amd64
-
-            GOOS=linux GOARCH=amd64 make dev
-            cp bin/nomad $HOME/artifacts/nomad-linux-amd64
+            # Pull the git repo
+            # Build the necessary binaries (check "make help")
+            # Put the artifacts in "$HOME/artifacts" to upload them
     - script@1:
         title: Nomad server setup
         inputs:
-        - content: |-
+        - content: |+
             #!/usr/bin/env bash
             set -xeo pipefail
 
-            ansible-playbook -i "localhost," -c local /mnt/data/nomad_server.playbook.yaml
+            # Bootstrap and start the nomad server here
     - script@1:
         title: Nomad client setup
         inputs:
-        - content: |-
+        - content: |+
             #!/usr/bin/env bash
             set -xeo pipefail
 
-            ansible-playbook -i "localhost," -c local /mnt/data/nomad_client.playbook.yaml
+            # Bootstrap and start the nomad client
+            ansible-playbook -f 1 -i inventory --limit nomad_client playbooks/nomad_client.playbook.yaml
     - script@1:
         title: Launch test job
         inputs:
-        - content: |-
+        - content: |+
             #!/usr/bin/env bash
             set -xeo pipefail
 
-            cat <<EOF > nomad-challenge-job.nomad
-            job "nomad-challenge-job" {
-              datacenters = ["nomad-challenge-dc"]
-              type = "batch"
-              group "example" {
-                task "raw_exec" {
-                  driver = "raw_exec"
-                  config {
-                    command = "./challenge.sh"
-                  }
-                }
-              }
-            }
-            EOF
+            # Launch the test nomad job here
+    - script@1:
+        title: Other shell steps - feel free to copy it
+        inputs:
+        - content: |+
+            #!/usr/bin/env bash
+            set -xeo pipefail
 
-            nomad job run nomad-challenge-job.nomad
     - script@1:
         title: Run tests - this must run green!
         inputs:
         - content: |-
             #!/usr/bin/env bash
+
             set -xeo pipefail
 
             infra-tests/test.sh
         is_always_run: true
+    - script@1:
+        title: SLEEP - delete later
+        inputs:
+        - content: |-
+            #!/usr/bin/env bash
+
+            set -xeo pipefail
+
+            sleep 1200
+        is_always_run: true
     - deploy-to-bitrise-io@2:
         inputs:
-        - deploy_path: "$HOME/artifacts"
+        - deploy_path: "/Users/vagrant/artifacts"
